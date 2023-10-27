@@ -49,8 +49,12 @@ def get_graph() -> DataHubGraph:
     if TEST_MODE:
         return get_default_graph()
     else:
-        DATAHUB_SERVER = os.environ["DATAHUB_GMS_HOST"]
+        try:
+            DATAHUB_SERVER = os.environ["DATAHUB_GMS_URL"] 
+        except:
+            DATAHUB_SERVER = "http://localhost:8080"
         DATAHUB_TOKEN: Optional[str] = os.getenv("DATAHUB_GMS_TOKEN")
+            
 
         return DataHubGraph(
             DatahubClientConfig(server=DATAHUB_SERVER, token=DATAHUB_TOKEN)
@@ -219,10 +223,13 @@ def fetch_datahub_glossary():
         if parent_urn is None:
             top_level_terms.append(term)
         else:
-            parent_node, _ = raw_nodes[parent_urn]
-            parent_node.terms = parent_node.terms or []
-            parent_node.terms.append(term)
-
+            try:
+                parent_node, _ = raw_nodes[parent_urn]
+                parent_node.terms = parent_node.terms or []
+                parent_node.terms.append(term)
+            except:
+                print("[+] Error, stale Node:", parent_urn, " and stale Term: id=", term.id, " name=", term.name )
+                continue
     return top_level_nodes, top_level_terms
 
 
@@ -524,11 +531,13 @@ def update_glossary_file(
 
 
 @cli.command()
+@click.option("--enable-auto-id", type=bool, required=True, default=True)
 @click.option("--output", type=click.Path(), required=True)
 @click.option("--default-source-ref")
 @click.option("--default-source-url")
 @click.option("--default-source-type")
 def bootstrap_glossary_yml(
+    enable_auto_id: bool,
     output: str,
     default_source_ref: Optional[str],
     default_source_url: Optional[str],
@@ -548,7 +557,7 @@ owners: {}
 
     pathlib.Path(output).write_text(default_yml)
 
-    _update_glossary_file(output, enable_auto_id=True, output=output, prune=False)
+    _update_glossary_file(output, enable_auto_id=enable_auto_id, output=output, prune=False)
 
 
 if __name__ == "__main__":
